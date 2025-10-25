@@ -63,9 +63,11 @@ function loadSheetsConfig() {
         sheetsConfig = JSON.parse(savedConfig);
         if (sheetsConfig.connected) {
             document.getElementById('spreadsheetId').value = sheetsConfig.spreadsheetId;
+            document.getElementById('scriptUrl').value = sheetsConfig.scriptUrl || '';
             document.getElementById('connectBtn').style.display = 'none';
             document.getElementById('disconnectBtn').style.display = 'block';
-            showStatus('เชื่อมต่อกับ Google Sheets แล้ว', 'success', 'connectionStatus');
+            document.getElementById('testSyncBtn').style.display = 'block';
+            showStatus('✅ เชื่อมต่อกับ Google Sheets แล้ว', 'success', 'connectionStatus');
         }
     }
 }
@@ -102,6 +104,7 @@ function setupEventListeners() {
     
     // ตั้งค่า
     document.getElementById('connectBtn').addEventListener('click', connectGoogleSheets);
+    document.getElementById('testSyncBtn').addEventListener('click', testSync);
     document.getElementById('disconnectBtn').addEventListener('click', disconnectGoogleSheets);
     document.getElementById('exportBtn').addEventListener('click', exportData);
     document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
@@ -368,14 +371,27 @@ function filterByPeriod(data, period) {
 // ==================== Google Sheets ====================
 function connectGoogleSheets() {
     const spreadsheetId = document.getElementById('spreadsheetId').value.trim();
+    const scriptUrl = document.getElementById('scriptUrl').value.trim();
     const apiKey = document.getElementById('apiKey').value.trim();
     
     if (!spreadsheetId) {
-        showStatus('กรุณาใส่ Spreadsheet ID', 'error', 'connectionStatus');
+        showStatus('❌ กรุณาใส่ Spreadsheet ID', 'error', 'connectionStatus');
+        return;
+    }
+    
+    if (!scriptUrl) {
+        showStatus('❌ กรุณาใส่ Script URL', 'error', 'connectionStatus');
+        return;
+    }
+    
+    // ตรวจสอบรูปแบบ URL
+    if (!scriptUrl.includes('script.google.com')) {
+        showStatus('❌ Script URL ไม่ถูกต้อง (ต้องเป็น URL จาก Google Apps Script)', 'error', 'connectionStatus');
         return;
     }
     
     sheetsConfig.spreadsheetId = spreadsheetId;
+    sheetsConfig.scriptUrl = scriptUrl;
     sheetsConfig.apiKey = apiKey;
     sheetsConfig.connected = true;
     
@@ -383,15 +399,11 @@ function connectGoogleSheets() {
     
     document.getElementById('connectBtn').style.display = 'none';
     document.getElementById('disconnectBtn').style.display = 'block';
+    document.getElementById('testSyncBtn').style.display = 'block';
     
-    showStatus('เชื่อมต่อสำเร็จ! (หมายเหตุ: การซิงค์จริงต้องตั้งค่า Google Apps Script)', 'success', 'connectionStatus');
+    showStatus('✅ เชื่อมต่อสำเร็จ! คลิก "ทดสอบการซิงค์" เพื่อตรวจสอบ', 'success', 'connectionStatus');
     
-    // ซิงค์ข้อมูลทั้งหมด
-    if (isOnline) {
-        pendingSync = [...transactions];
-        saveToLocalStorage();
-        syncToGoogleSheets();
-    }
+    showNotification('✅ เชื่อมต่อ Google Sheets สำเร็จ');
 }
 
 function disconnectGoogleSheets() {
@@ -400,12 +412,57 @@ function disconnectGoogleSheets() {
     }
     
     sheetsConfig.connected = false;
+    sheetsConfig.scriptUrl = '';
     saveSheetsConfig();
     
     document.getElementById('connectBtn').style.display = 'block';
     document.getElementById('disconnectBtn').style.display = 'none';
+    document.getElementById('testSyncBtn').style.display = 'none';
     
     showStatus('ยกเลิกการเชื่อมต่อแล้ว', 'success', 'connectionStatus');
+}
+
+async function testSync() {
+    if (!sheetsConfig.connected) {
+        showStatus('❌ กรุณาเชื่อมต่อก่อน', 'error', 'connectionStatus');
+        return;
+    }
+    
+    showStatus('⏳ กำลังทดสอบการซิงค์...', 'success', 'connectionStatus');
+    showNotification('⏳ กำลังทดสอบการเชื่อมต่อ...');
+    
+    // สร้างข้อมูลทดสอบ
+    const testTransaction = {
+        id: 'TEST-' + Date.now(),
+        type: 'รายรับ',
+        amount: 1,
+        category: 'ทดสอบ',
+        date: new Date().toISOString().split('T')[0],
+        note: 'ข้อมูลทดสอบการเชื่อมต่อ',
+        createdAt: new Date().toISOString()
+    };
+    
+    try {
+        const response = await fetch(sheetsConfig.scriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                spreadsheetId: sheetsConfig.spreadsheetId,
+                transactions: [testTransaction]
+            })
+        });
+        
+        showStatus('✅ ส่งข้อมูลทดสอบแล้ว! ไปตรวจสอบใน Google Sheets ว่ามีข้อมูลหรือไม่', 'success', 'connectionStatus');
+        showNotification('✅ ส่งข้อมูลทดสอบแล้ว ตรวจสอบใน Google Sheets');
+        
+    } catch (error) {
+        console.error('Test error:', error);
+        showStatus('❌ การทดสอบล้มเหลว: ' + error.message, 'error', 'connectionStatus');
+        showNotification('❌ ทดสอบล้มเหลว โปรดตรวจสอบ Script URL');
+    }
 }
 
 async function syncToGoogleSheets() {
@@ -413,13 +470,18 @@ async function syncToGoogleSheets() {
         return;
     }
     
-    updateSyncStatus('กำลังซิงค์...');
+    // ตรวจสอบว่ามี Script URL หรือไม่
+    if (!sheetsConfig.scriptUrl || sheetsConfig.scriptUrl === '') {
+        updateSyncStatus('❌ ยังไม่ได้ตั้งค่า Script URL');
+        console.error('Script URL ไม่ถูกต้อง');
+        return;
+    }
+    
+    updateSyncStatus('⏳ กำลังซิงค์...');
+    console.log('เริ่มซิงค์', pendingSync.length, 'รายการ');
     
     try {
-        // หมายเหตุ: ต้องสร้าง Google Apps Script Web App แยกต่างหาก
-        // ตัวอย่างนี้แสดงโครงสร้างการส่งข้อมูล
-        
-        const response = await fetch(`https://script.google.com/macros/s/AKfycbx2sQpoult5m1cfZ78Ubw-hhrK_7hSQaglfxAmRspkU0wk-VIRs89A40gp7eLJXKed8/exec`, {
+        const response = await fetch(sheetsConfig.scriptUrl, {
             method: 'POST',
             mode: 'no-cors',
             headers: {
@@ -431,21 +493,28 @@ async function syncToGoogleSheets() {
             })
         });
         
+        // เนื่องจากใช้ no-cors จะไม่สามารถอ่าน response ได้
+        // ถือว่าสำเร็จหากไม่มี error
+        console.log('ส่งข้อมูลไปแล้ว');
+        
         // ทำเครื่องหมายว่าซิงค์แล้ว
         pendingSync.forEach(pending => {
             const t = transactions.find(tr => tr.id === pending.id);
             if (t) t.synced = true;
         });
         
+        const syncedCount = pendingSync.length;
         pendingSync = [];
         saveToLocalStorage();
         
-        updateSyncStatus('ซิงค์สำเร็จ ✓');
-        setTimeout(() => updateSyncStatus(''), 3000);
+        updateSyncStatus(`✅ ซิงค์สำเร็จ ${syncedCount} รายการ`);
+        showNotification(`✅ ซิงค์ ${syncedCount} รายการไปยัง Google Sheets`);
+        setTimeout(() => updateSyncStatus(''), 5000);
         
     } catch (error) {
         console.error('Sync error:', error);
-        updateSyncStatus('ซิงค์ล้มเหลว');
+        updateSyncStatus('❌ ซิงค์ล้มเหลว: ' + error.message);
+        showNotification('❌ ซิงค์ล้มเหลว โปรดตรวจสอบการตั้งค่า');
     }
 }
 
