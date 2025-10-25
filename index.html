@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="แอพบันทึกรายรับรายจ่าย">
+    <title>บันทึกรายรับรายจ่าย</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2196F3">
+</head>
+<body>
+    <!-- แสดงสถานะการเชื่อมต่อ -->
+    <div id="statusBar" class="status-bar offline">
+        <span id="statusText">📡 ออฟไลน์</span>
+        <span id="syncStatus"></span>
+    </div>
+
+    <!-- เมนูนำทาง -->
+    <nav class="navbar">
+        <h1>💰 บันทึกรายรับรายจ่าย</h1>
+    </nav>
+
+    <!-- แท็บเมนู -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="record">บันทึก</button>
+        <button class="tab-btn" data-tab="summary">สรุปผล</button>
+        <button class="tab-btn" data-tab="history">ประวัติ</button>
+        <button class="tab-btn" data-tab="settings">ตั้งค่า</button>
+    </div>
+
+    <div class="container">
+        <!-- หน้าบันทึกรายการ -->
+        <div id="recordTab" class="tab-content active">
+            <h2>📝 บันทึกรายการใหม่</h2>
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label>ประเภท</label>
+                    <div class="type-buttons">
+                        <button type="button" class="type-btn active" data-type="รายรับ">
+                            ✅ รายรับ
+                        </button>
+                        <button type="button" class="type-btn" data-type="รายจ่าย">
+                            ❌ รายจ่าย
+                        </button>
+                    </div>
+                    <input type="hidden" id="type" name="type" value="รายรับ" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amount">จำนวนเงิน (บาท)</label>
+                    <input type="number" id="amount" name="amount" step="0.01" placeholder="0.00" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">หมวดหมู่</label>
+                    <select id="category" name="category" required>
+                        <option value="">-- เลือกหมวดหมู่ --</option>
+                        <!-- จะถูกเติมด้วย JavaScript -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="date">วันที่</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="note">หมายเหตุ (ไม่บังคับ)</label>
+                    <textarea id="note" name="note" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">💾 บันทึก</button>
+            </form>
+        </div>
+
+        <!-- หน้าสรุปผล -->
+        <div id="summaryTab" class="tab-content">
+            <h2>📊 สรุปรายรับรายจ่าย</h2>
+            
+            <div class="summary-filter">
+                <label for="summaryPeriod">ช่วงเวลา:</label>
+                <select id="summaryPeriod">
+                    <option value="today">วันนี้</option>
+                    <option value="week">สัปดาห์นี้</option>
+                    <option value="month" selected>เดือนนี้</option>
+                    <option value="year">ปีนี้</option>
+                    <option value="all">ทั้งหมด</option>
+                </select>
+            </div>
+
+            <div class="summary-cards">
+                <div class="card income">
+                    <h3>รายรับ</h3>
+                    <p class="amount" id="totalIncome">0.00</p>
+                    <span>บาท</span>
+                </div>
+                <div class="card expense">
+                    <h3>รายจ่าย</h3>
+                    <p class="amount" id="totalExpense">0.00</p>
+                    <span>บาท</span>
+                </div>
+                <div class="card balance">
+                    <h3>คงเหลือ</h3>
+                    <p class="amount" id="netBalance">0.00</p>
+                    <span>บาท</span>
+                </div>
+            </div>
+
+            <div class="category-summary">
+                <h3>สรุปตามหมวดหมู่</h3>
+                <div id="categoryBreakdown"></div>
+            </div>
+        </div>
+
+        <!-- หน้าประวัติ -->
+        <div id="historyTab" class="tab-content">
+            <h2>📜 ประวัติรายการ</h2>
+            
+            <div class="history-filter">
+                <input type="text" id="searchHistory" placeholder="🔍 ค้นหา...">
+                <select id="filterType">
+                    <option value="all">ทั้งหมด</option>
+                    <option value="รายรับ">รายรับ</option>
+                    <option value="รายจ่าย">รายจ่าย</option>
+                </select>
+            </div>
+
+            <div id="historyList" class="history-list">
+                <!-- รายการจะถูกเติมด้วย JavaScript -->
+            </div>
+        </div>
+
+        <!-- หน้าตั้งค่า -->
+        <div id="settingsTab" class="tab-content">
+            <h2>⚙️ ตั้งค่า</h2>
+            
+            <div class="settings-section">
+                <h3>🔗 เชื่อมต่อ Google Sheets</h3>
+                <p class="help-text">เชื่อมต่อกับ Google Sheets เพื่อสำรองข้อมูลออนไลน์</p>
+                
+                <div class="form-group">
+                    <label for="spreadsheetId">Spreadsheet ID</label>
+                    <input type="text" id="spreadsheetId" placeholder="ใส่ ID จาก URL ของ Google Sheet">
+                    <small>ตัวอย่าง: https://docs.google.com/spreadsheets/d/<strong>YOUR_ID</strong>/edit</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKey">API Key (ไม่บังคับ)</label>
+                    <input type="password" id="apiKey" placeholder="ใส่ API Key ถ้ามี">
+                </div>
+
+                <button class="btn btn-primary" id="connectBtn">🔗 เชื่อมต่อ</button>
+                <button class="btn btn-secondary" id="disconnectBtn" style="display:none;">❌ ยกเลิกการเชื่อมต่อ</button>
+                
+                <div id="connectionStatus" class="status-message"></div>
+            </div>
+
+            <div class="settings-section">
+                <h3>📁 จัดการข้อมูล</h3>
+                <button class="btn btn-secondary" id="exportBtn">📤 ส่งออกข้อมูล (JSON)</button>
+                <button class="btn btn-secondary" id="importBtn">📥 นำเข้าข้อมูล</button>
+                <input type="file" id="importFile" accept=".json" style="display:none;">
+                <button class="btn btn-danger" id="clearBtn">🗑️ ลบข้อมูลทั้งหมด</button>
+            </div>
+
+            <div class="settings-section">
+                <h3>📋 จัดการหมวดหมู่</h3>
+                <div id="categoryManager"></div>
+                <div class="form-group">
+                    <input type="text" id="newCategory" placeholder="เพิ่มหมวดหมู่ใหม่">
+                    <button class="btn btn-primary" id="addCategoryBtn">➕ เพิ่ม</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3>ℹ️ เกี่ยวกับ</h3>
+                <p>แอพบันทึกรายรับรายจ่าย เวอร์ชัน 1.0</p>
+                <p>ใช้งานได้ทั้งออนไลน์และออฟไลน์</p>
+                <p>ข้อมูลจัดเก็บบนเครื่องและ Google Sheets (ถ้าเชื่อมต่อ)</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
