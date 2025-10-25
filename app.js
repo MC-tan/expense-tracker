@@ -419,7 +419,7 @@ async function syncToGoogleSheets() {
         // หมายเหตุ: ต้องสร้าง Google Apps Script Web App แยกต่างหาก
         // ตัวอย่างนี้แสดงโครงสร้างการส่งข้อมูล
         
-        const response = await fetch(`https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec`, {
+        const response = await fetch(`https://script.google.com/macros/s/AKfycbxe2RgaGta-BMqcd8GKGVGjlR3tKrZMavNJfhugRMOJExJSIjSnLsVVHbrcnAhUICPH/exec`, {
             method: 'POST',
             mode: 'no-cors',
             headers: {
